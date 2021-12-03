@@ -1,62 +1,82 @@
 import axios from "axios";
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
 import "./App.css";
+import { AppBar, Toolbar, Paper, Card, Fab } from "@mui/material";
 
-const redirectURI = process.env.REDIRECT_URI || "http://localhost:3000";
+import { Routes, Route, Outlet, Link } from "react-router-dom";
+import { parseHash } from "./util";
+
+const redirectURI = process.env.REDIRECT_URI || "http://localhost:3000/auth";
 const clientID = "1jm2ajf9hva6pa6pz16zacwe8fa0ez";
-const scopes = "channel:read:redemptions channel:read:subscriptions";
-const twitchRoot = `https://api.twitch.tv/helix`;
+const scopes =
+  "channel:read:redemptions channel:manage:redemptions channel:read:subscriptions";
+
+const AccessTokenContext = React.createContext("");
+
+const AuthPage = (props) => {
+  const { setAccessToken } = props;
+  const loc = useLocation();
+  useEffect(() => {
+    const hash = parseHash(loc.hash).access_token;
+    setAccessToken(hash);
+  });
+
+  return <></>;
+};
+
+// const [accessToken, setAccessToken] = useState("");
+
+/* const loc = useLocation();
+const accessToken = parseHash(loc.hash).access_token;
+
+useEffect(() => {
+  console.log(parseHash(loc.hash).access_token);
+  setAccessToken(parseHash(loc.hash).access_token);
+}, []); */
 
 function App() {
-  const [subs, setSubs] = useState([]);
-  const [broadcasterID, setBroadcasterID] = "";
+  const [accessToken, setAccessToken] = useState("");
+  const loc = useLocation();
+  const navigate = useNavigate();
 
-  const getUser = async () => {
-    const data = await axios.get(`${twitchRoot}/users`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Client-Id": clientID,
-      },
-    });
-    console.log(data);
-  };
-
-  const getSubs = async () => {
-    const newSubs = await axios.get(
-      `${twitchRoot}/subscriptions/?broadcaster_id=${broadcasterID}`
-    );
-    setSubs([...subs, ...newSubs]);
-  };
-
-  const hash = document.location.hash
-    .slice(1)
-    .split("&")
-    .reduce((prev, curr) => {
-      const entry = curr.split("=");
-      return {
-        ...prev,
-        [entry[0]]: entry[1],
-      };
-    }, {});
-
-  console.log(hash);
-  const accessToken = hash["access_token"];
-
-  const me = accessToken ? getUser() : "";
-  console.log(me);
+  const authLink = `https://id.twitch.tv/oauth2/authorize?client_id=${clientID}&redirect_uri=${redirectURI}&response_type=token&scope=${scopes}`;
 
   return (
-    <body>
-      {accessToken ? (
-        `${JSON.stringify(me)}`
-      ) : (
-        <a
-          href={`https://id.twitch.tv/oauth2/authorize?client_id=${clientID}&redirect_uri=${redirectURI}&response_type=token&scope=${scopes}`}
-        >
-          login
-        </a>
-      )}
-    </body>
+    <>
+      <AccessTokenContext.Provider value={accessToken}>
+        <AppBar position="sticky">
+          <Toolbar>
+            {accessToken ? (
+              <>
+                <div>`your access token is ${accessToken}`</div>
+                <Fab
+                  onClick={() => {
+                    navigate("/logout");
+                    setAccessToken("");
+                  }}
+                >
+                  Log out
+                </Fab>
+              </>
+            ) : (
+              <Fab href={authLink}>login</Fab>
+            )}
+            <Link to="foo">Foo</Link>
+            <Link to="bar">Bar</Link>
+          </Toolbar>
+        </AppBar>
+
+        <Routes>
+          <Route
+            path="auth"
+            element={<AuthPage setAccessToken={setAccessToken} />}
+          />
+          <Route path="foo" element={<div>"foo"</div>} />
+          <Route path="bar" element={<div>"bar"</div>} />
+        </Routes>
+      </AccessTokenContext.Provider>
+    </>
   );
 }
 
